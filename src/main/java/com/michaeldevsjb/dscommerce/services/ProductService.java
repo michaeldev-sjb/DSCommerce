@@ -3,11 +3,15 @@ package com.michaeldevsjb.dscommerce.services;
 import com.michaeldevsjb.dscommerce.dto.ProductDTO;
 import com.michaeldevsjb.dscommerce.entities.Product;
 import com.michaeldevsjb.dscommerce.repositories.ProductRepository;
+import com.michaeldevsjb.dscommerce.services.exceptions.DatabaseException;
 import com.michaeldevsjb.dscommerce.services.exceptions.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -35,26 +39,40 @@ public class ProductService {
     public ProductDTO insert(ProductDTO dto){
 
         Product entity = new Product();
-        copyDtoToEntuty(dto, entity);
+        copyDtoToEntity(dto, entity);
         entity = repository.save(entity);
         return new ProductDTO(entity);
     }
 
     @Transactional
-    public ProductDTO update(Long id, ProductDTO dto){
-
+    public ProductDTO update(Long id, ProductDTO dto) {
+        try {
         Product entity = repository.getReferenceById(id);
-        copyDtoToEntuty(dto, entity);
+        copyDtoToEntity(dto, entity);
         entity = repository.save(entity);
         return new ProductDTO(entity);
+        }
+        catch (EntityNotFoundException e) {
+            throw new ResourceNotFoundException("Recurso não encontrado");
+        }
     }
 
-    @Transactional
+
+
+    @Transactional(propagation = Propagation.SUPPORTS)
     public void delete(Long id){
-        repository.deleteById(id);
+        if(!repository.existsById(id)){
+            throw new ResourceNotFoundException("Recurso não encontrado");
+        }
+        try {
+            repository.deleteById(id);
+        }catch (DataIntegrityViolationException e) {
+            throw new DatabaseException("Falha de integridade referencial");
+        }
+
     }
 
-    private void copyDtoToEntuty(ProductDTO dto, Product entity) {
+    private void copyDtoToEntity(ProductDTO dto, Product entity) {
         entity.setName(dto.getName());
         entity.setDescription(dto.getDescription());
         entity.setPrice(dto.getPrice());
